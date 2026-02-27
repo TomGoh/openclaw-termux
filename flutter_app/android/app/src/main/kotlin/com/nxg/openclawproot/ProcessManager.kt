@@ -1,5 +1,6 @@
 package com.nxg.openclawproot
 
+import android.os.Build
 import android.os.Environment
 import java.io.BufferedReader
 import java.io.File
@@ -96,12 +97,35 @@ class ProcessManager(
             "--bind=$configDir/resolv.conf:/etc/resolv.conf",
             "--bind=$homeDir:/root/home",
         ).let { flags ->
-            // Bind-mount shared storage into proot if accessible (Termux-style)
-            val sdcard = Environment.getExternalStorageDirectory()
-            if (sdcard.exists() && sdcard.canRead()) {
-                val sdcardDir = File("$rootfsDir/sdcard")
-                sdcardDir.mkdirs()
-                flags + "--bind=${sdcard.absolutePath}:/sdcard"
+            // Bind-mount shared storage into proot (Termux proot-distro style).
+            // Bind the whole /storage tree so symlinks and sub-mounts resolve.
+            // Then create /sdcard symlink inside rootfs pointing to the right path.
+            val hasAccess = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                Environment.isExternalStorageManager()
+            } else {
+                val sdcard = Environment.getExternalStorageDirectory()
+                sdcard.exists() && sdcard.canRead()
+            }
+
+            if (hasAccess) {
+                val storageDir = File("$rootfsDir/storage")
+                storageDir.mkdirs()
+                // Create /sdcard symlink → /storage/emulated/0 inside rootfs
+                val sdcardLink = File("$rootfsDir/sdcard")
+                if (!sdcardLink.exists()) {
+                    try {
+                        Runtime.getRuntime().exec(
+                            arrayOf("ln", "-sf", "/storage/emulated/0", "$rootfsDir/sdcard")
+                        ).waitFor()
+                    } catch (_: Exception) {
+                        // Fallback: create as directory if symlink fails
+                        sdcardLink.mkdirs()
+                    }
+                }
+                flags + listOf(
+                    "--bind=/storage:/storage",
+                    "--bind=/storage/emulated/0:/sdcard"
+                )
             } else {
                 flags
             }
