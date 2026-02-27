@@ -1,6 +1,8 @@
 package com.nxg.openclawproot
 
+import android.os.Environment
 import java.io.BufferedReader
+import java.io.File
 import java.io.InputStreamReader
 
 /**
@@ -93,7 +95,17 @@ class ProcessManager(
             // App-specific binds
             "--bind=$configDir/resolv.conf:/etc/resolv.conf",
             "--bind=$homeDir:/root/home",
-        )
+        ).let { flags ->
+            // Bind-mount shared storage into proot if accessible (Termux-style)
+            val sdcard = Environment.getExternalStorageDirectory()
+            if (sdcard.exists() && sdcard.canRead()) {
+                val sdcardDir = File("$rootfsDir/sdcard")
+                sdcardDir.mkdirs()
+                flags + "--bind=${sdcard.absolutePath}:/sdcard"
+            } else {
+                flags
+            }
+        }
     }
 
     // ================================================================
