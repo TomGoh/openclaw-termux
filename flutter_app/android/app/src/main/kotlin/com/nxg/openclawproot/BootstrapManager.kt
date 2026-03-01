@@ -1213,12 +1213,16 @@ require('/root/.openclaw/proot-compat.js');
     }
 
     fun writeResolvConf() {
-        // Only create the config directory — not the full setupDirectories()
-        // which also runs setupLibtalloc/setupFakeSysdata that may fail
-        // before rootfs is extracted (first-time setup). (#40)
-        File(configDir).mkdirs()
-
-        File(configDir, "resolv.conf").writeText("nameserver 8.8.8.8\nnameserver 8.8.4.4\n")
+        // Ensure the config directory exists. Use context.filesDir as the
+        // canonical base (Android always ensures it exists) rather than
+        // relying solely on the String path, which may point to a directory
+        // that was cleared during an app upgrade. (#40)
+        val dir = File(context.filesDir, "config")
+        if (!dir.exists()) {
+            dir.mkdirs()
+        }
+        val resolv = File(dir, "resolv.conf")
+        resolv.writeText("nameserver 8.8.8.8\nnameserver 8.8.4.4\n")
     }
 
     /** Read a file from inside the rootfs (e.g. /root/.openclaw/openclaw.json). */

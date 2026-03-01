@@ -45,7 +45,7 @@ class GatewayService {
       // an upgrade or while the app was in the background (#40).
       try { await NativeBridge.setupDirs(); } catch (_) {}
       // Refresh resolv.conf so DNS keeps working.
-      await NativeBridge.writeResolv();
+      try { await NativeBridge.writeResolv(); } catch (_) {}
       // Write allowCommands config so the next gateway restart picks it up,
       // and in case the running gateway supports config hot-reload.
       await _writeNodeAllowConfig();
