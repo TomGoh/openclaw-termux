@@ -7,6 +7,7 @@ import 'package:flutter_pty/flutter_pty.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../constants.dart';
 import '../services/native_bridge.dart';
+import '../services/screenshot_service.dart';
 import '../services/terminal_service.dart';
 import '../services/preferences_service.dart';
 import '../widgets/terminal_toolbar.dart';
@@ -35,6 +36,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   String? _error;
   final _ctrlNotifier = ValueNotifier<bool>(false);
   final _altNotifier = ValueNotifier<bool>(false);
+  final _screenshotKey = GlobalKey();
   static final _anyUrlRegex = RegExp(r'https?://[^\s<>\[\]"' "'" r'\)]+');
   static final _tokenUrlRegex = RegExp(r'https?://(?:localhost|127\.0\.0\.1):18789/#token=[0-9a-f]+');
   static final _ansiEscape = AppConstants.ansiEscape;
@@ -301,6 +303,18 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     }
   }
 
+  Future<void> _takeScreenshot() async {
+    final path = await ScreenshotService.capture(_screenshotKey, prefix: 'onboarding');
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(path != null
+            ? 'Screenshot saved: ${path.split('/').last}'
+            : 'Failed to capture screenshot'),
+      ),
+    );
+  }
+
   void _handleTap(TapUpDetails details, CellOffset offset) {
     // Join adjacent lines and extract URL, handling wrapped URLs
     // and TUI box-drawing characters.
@@ -402,6 +416,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         automaticallyImplyLeading: false,
         actions: [
           IconButton(
+            icon: const Icon(Icons.camera_alt_outlined),
+            tooltip: 'Screenshot',
+            onPressed: _takeScreenshot,
+          ),
+          IconButton(
             icon: const Icon(Icons.copy),
             tooltip: 'Copy',
             onPressed: _copySelection,
@@ -472,16 +491,19 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             )
           else ...[
             Expanded(
-              child: TerminalView(
-                _terminal,
-                controller: _controller,
-                textStyle: const TerminalStyle(
-                  fontSize: 11,
-                  height: 1.0,
-                  fontFamily: 'DejaVuSansMono',
-                  fontFamilyFallback: _fontFallback,
+              child: RepaintBoundary(
+                key: _screenshotKey,
+                child: TerminalView(
+                  _terminal,
+                  controller: _controller,
+                  textStyle: const TerminalStyle(
+                    fontSize: 11,
+                    height: 1.0,
+                    fontFamily: 'DejaVuSansMono',
+                    fontFamilyFallback: _fontFallback,
+                  ),
+                  onTapUp: _handleTap,
                 ),
-                onTapUp: _handleTap,
               ),
             ),
             TerminalToolbar(

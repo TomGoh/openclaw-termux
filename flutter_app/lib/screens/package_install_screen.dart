@@ -6,6 +6,7 @@ import 'package:xterm/xterm.dart';
 import 'package:flutter_pty/flutter_pty.dart';
 import '../models/optional_package.dart';
 import '../services/native_bridge.dart';
+import '../services/screenshot_service.dart';
 import '../services/terminal_service.dart';
 import '../widgets/terminal_toolbar.dart';
 
@@ -34,6 +35,7 @@ class _PackageInstallScreenState extends State<PackageInstallScreen> {
   String? _error;
   final _ctrlNotifier = ValueNotifier<bool>(false);
   final _altNotifier = ValueNotifier<bool>(false);
+  final _screenshotKey = GlobalKey();
 
   static const _fontFallback = [
     'monospace',
@@ -153,6 +155,18 @@ class _PackageInstallScreenState extends State<PackageInstallScreen> {
     }
   }
 
+  Future<void> _takeScreenshot() async {
+    final path = await ScreenshotService.capture(_screenshotKey, prefix: 'package');
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(path != null
+            ? 'Screenshot saved: ${path.split('/').last}'
+            : 'Failed to capture screenshot'),
+      ),
+    );
+  }
+
   @override
   void dispose() {
     _ctrlNotifier.dispose();
@@ -172,6 +186,11 @@ class _PackageInstallScreenState extends State<PackageInstallScreen> {
         title: Text('$action ${widget.package.name}'),
         automaticallyImplyLeading: false,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.camera_alt_outlined),
+            tooltip: 'Screenshot',
+            onPressed: _takeScreenshot,
+          ),
           IconButton(
             icon: const Icon(Icons.paste),
             tooltip: 'Paste',
@@ -235,14 +254,17 @@ class _PackageInstallScreenState extends State<PackageInstallScreen> {
             )
           else ...[
             Expanded(
-              child: TerminalView(
-                _terminal,
-                controller: _controller,
-                textStyle: const TerminalStyle(
-                  fontSize: 11,
-                  height: 1.0,
-                  fontFamily: 'DejaVuSansMono',
-                  fontFamilyFallback: _fontFallback,
+              child: RepaintBoundary(
+                key: _screenshotKey,
+                child: TerminalView(
+                  _terminal,
+                  controller: _controller,
+                  textStyle: const TerminalStyle(
+                    fontSize: 11,
+                    height: 1.0,
+                    fontFamily: 'DejaVuSansMono',
+                    fontFamilyFallback: _fontFallback,
+                  ),
                 ),
               ),
             ),

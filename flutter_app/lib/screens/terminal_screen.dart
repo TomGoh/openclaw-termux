@@ -6,6 +6,7 @@ import 'package:xterm/xterm.dart';
 import 'package:flutter_pty/flutter_pty.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/native_bridge.dart';
+import '../services/screenshot_service.dart';
 import '../services/terminal_service.dart';
 import '../widgets/terminal_toolbar.dart';
 
@@ -24,6 +25,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
   String? _error;
   final _ctrlNotifier = ValueNotifier<bool>(false);
   final _altNotifier = ValueNotifier<bool>(false);
+  final _screenshotKey = GlobalKey();
   static final _anyUrlRegex = RegExp(r'https?://[^\s<>\[\]"' "'" r'\)]+');
   /// Box-drawing and other TUI characters that break URLs when copied
   static final _boxDrawing = RegExp(r'[│┤├┬┴┼╮╯╰╭─╌╴╶┌┐└┘◇◆]+');
@@ -234,6 +236,18 @@ class _TerminalScreenState extends State<TerminalScreen> {
     }
   }
 
+  Future<void> _takeScreenshot() async {
+    final path = await ScreenshotService.capture(_screenshotKey);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(path != null
+            ? 'Screenshot saved: ${path.split('/').last}'
+            : 'Failed to capture screenshot'),
+      ),
+    );
+  }
+
   /// Detect URLs in terminal at tap position. Joins adjacent lines
   /// and strips box-drawing chars to handle wrapped URLs.
   void _handleTap(TapUpDetails details, CellOffset offset) {
@@ -313,6 +327,11 @@ class _TerminalScreenState extends State<TerminalScreen> {
       appBar: AppBar(
         title: const Text('Terminal'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.camera_alt_outlined),
+            tooltip: 'Screenshot',
+            onPressed: _takeScreenshot,
+          ),
           IconButton(
             icon: const Icon(Icons.copy),
             tooltip: 'Copy',
@@ -399,16 +418,19 @@ class _TerminalScreenState extends State<TerminalScreen> {
     return Column(
       children: [
         Expanded(
-          child: TerminalView(
-            _terminal,
-            controller: _controller,
-            textStyle: const TerminalStyle(
-              fontSize: 11,
-              height: 1.0,
-              fontFamily: 'DejaVuSansMono',
-              fontFamilyFallback: _fontFallback,
+          child: RepaintBoundary(
+            key: _screenshotKey,
+            child: TerminalView(
+              _terminal,
+              controller: _controller,
+              textStyle: const TerminalStyle(
+                fontSize: 11,
+                height: 1.0,
+                fontFamily: 'DejaVuSansMono',
+                fontFamilyFallback: _fontFallback,
+              ),
+              onTapUp: _handleTap,
             ),
-            onTapUp: _handleTap,
           ),
         ),
         TerminalToolbar(
