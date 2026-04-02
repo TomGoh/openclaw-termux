@@ -299,12 +299,7 @@ class GatewayService : Service() {
                 try {
                     proc.destroy() // SIGTERM — lets proot clean up its children
                     if (!proc.waitFor(3, java.util.concurrent.TimeUnit.SECONDS)) {
-                        // proot did not exit in time; force-kill the process tree.
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                            try {
-                                proc.toHandle().descendants().forEach { it.destroyForcibly() }
-                            } catch (_: Exception) {}
-                        }
+                        // proot did not exit cleanly; force-kill it.
                         proc.destroyForcibly()
                     }
                 } catch (_: Exception) {
